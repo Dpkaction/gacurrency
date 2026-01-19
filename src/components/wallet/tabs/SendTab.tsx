@@ -15,7 +15,7 @@ const SendTab = ({ activeWallet }: SendTabProps) => {
   const [recipientAddress, setRecipientAddress] = useState("");
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
-  const [fee, setFee] = useState("0.001");
+  const [fee, setFee] = useState("0.1");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const wallet = wallets.find(w => w.address === activeWallet);
@@ -59,7 +59,7 @@ const SendTab = ({ activeWallet }: SendTabProps) => {
         setRecipientAddress("");
         setLabel("");
         setAmount("");
-        setFee("0.001");
+        setFee("0.1");
       } else {
         toast({ title: "Error", description: result.error, variant: "destructive" });
       }

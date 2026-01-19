@@ -298,35 +298,52 @@ class GSCBlockchainService {
     return address.substring(4) + Math.random().toString(16).substring(2, 10);
   }
 
-  // Create transaction
-  async createTransaction(sender: string, receiver: string, amount: number, fee: number): Promise<GSCTransaction> {
-    const timestamp = Date.now();
-    const txString = `${sender}${receiver}${amount}${fee}${timestamp}`;
-    const tx_id = await this.generateGSCHash(txString, 64);
+  // Create transaction - GSC Compatible
+  async createTransaction(sender: string, receiver: string, amount: number, fee: number = 0.1): Promise<GSCTransaction> {
+    // Use GSC minimum fee of 0.1 GSC
+    const gscFee = fee || 0.1;
     
+    // Ensure minimum fee requirement
+    if (sender !== "COINBASE" && sender !== "GENESIS" && gscFee < 0.1) {
+      throw new Error("Minimum transaction fee is 0.1 GSC");
+    }
+
     const transaction: GSCTransaction = {
       sender,
       receiver,
       amount,
-      fee,
-      timestamp,
-      tx_id,
-      signature: await this.signGSCTransaction({
-        sender, receiver, amount, fee, timestamp, tx_id, signature: ""
-      })
+      fee: gscFee,
+      timestamp: Date.now() / 1000, // Unix timestamp with decimal precision (like GSC exe)
+      signature: "",
+      tx_id: "",
     };
+
+    // Calculate transaction ID using GSC-compatible hash (64-character hex)
+    transaction.tx_id = await this.calculateGSCTransactionHash(transaction);
+    
+    // Sign transaction (GSC exe compatible)
+    transaction.signature = await this.signGSCTransaction(transaction);
 
     return transaction;
   }
 
-  // Generate GSC hash
+  // Generate GSC hash - Exact Reference Implementation
   private async generateGSCHash(input: string, length: number = 64): Promise<string> {
+    // Use Web Crypto API to generate SHA256 hash (matching GSC exe)
     const encoder = new TextEncoder();
     const data = encoder.encode(input);
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex.substring(0, length);
+    
+    // Return full 64-character SHA256 hash (matching GSC exe exactly)
+    return hashHex;
+  }
+
+  private async calculateGSCTransactionHash(tx: GSCTransaction): Promise<string> {
+    // Match original GSC transaction hash calculation - create 64-character hex
+    const txString = `${tx.sender}${tx.receiver}${tx.amount}${tx.fee}${tx.timestamp}`;
+    return await this.generateGSCHash(txString, 64);
   }
 
   // Sign GSC transaction
@@ -345,7 +362,7 @@ class GSCBlockchainService {
       }
       
       let balance = this.getWalletBalance(senderWallet.address);
-      const fee = 0.1;
+      const fee = 0.1; // Minimum transaction fee is 0.1 GSC
       
       if (balance === 0 && senderWallet.balance > 0) {
         balance = senderWallet.balance;
@@ -639,8 +656,8 @@ class GSCBlockchainService {
         return;
       }
       
-      // Create the structured JSON message format
-      const transactionData = {
+      // Create structured JSON message format (matching GSC exe test_telegram_import.py exactly)
+      const structuredMessage = {
         type: "GSC_TRANSACTION",
         timestamp: new Date().toISOString(),
         transaction: {
@@ -650,11 +667,23 @@ class GSCBlockchainService {
           amount: transaction.amount,
           fee: transaction.fee,
           timestamp: transaction.timestamp,
-          signature: transaction.signature
+          signature: transaction.signature || ""
         }
       };
       
-      const transactionMessage = JSON.stringify(transactionData, null, 2);
+      // Log the exact format being sent for debugging
+      console.log("=== TELEGRAM BROADCAST DEBUG ===");
+      console.log("Structured message:", JSON.stringify(structuredMessage, null, 2));
+      console.log("Transaction validation:");
+      console.log("- Sender valid:", this.validateGSCAddress(transaction.sender));
+      console.log("- Receiver valid:", this.validateGSCAddress(transaction.receiver));
+      console.log("- Amount > 0:", transaction.amount > 0);
+      console.log("- Fee >= 0:", transaction.fee >= 0);
+      console.log("- TX ID length:", transaction.tx_id.length);
+      console.log("- TX ID valid hex:", /^[0-9a-fA-F]{64}$/.test(transaction.tx_id));
+      
+      // Send clean JSON format only (no markdown formatting)
+      const transactionMessage = JSON.stringify(structuredMessage, null, 2);
 
       let success = false;
       let errorDetails = "";
@@ -682,8 +711,6 @@ class GSCBlockchainService {
           });
           
           const responseData = await response.json();
-          console.log(`📋 Response for ${chatId}:`, responseData);
-          
           if (response.ok && responseData.ok) {
             success = true;
             console.log(`✅ Transaction successfully broadcast to ${chatId}`);
