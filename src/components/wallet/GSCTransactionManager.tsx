@@ -85,7 +85,7 @@ const GSCTransactionManager = ({ activeWallet, onBalanceUpdate }: GSCTransaction
         
         toast({
           title: "Transaction Sent",
-          description: `Successfully sent ${amount} GSC and broadcasted to Telegram`,
+          description: `Successfully sent ${amount} GSC and broadcast to network`,
         });
       }
     } catch (error) {
@@ -142,7 +142,7 @@ const GSCTransactionManager = ({ activeWallet, onBalanceUpdate }: GSCTransaction
                 Send GSC Coins
               </CardTitle>
               <CardDescription>
-                Send GSC coins to another address. Transactions are automatically broadcasted to Telegram.
+                Send GSC coins to another address. Transactions are automatically broadcast to network.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -213,7 +213,7 @@ const GSCTransactionManager = ({ activeWallet, onBalanceUpdate }: GSCTransaction
                 {isLoading ? (
                   <>
                     <Clock className="w-4 h-4 mr-2 animate-spin" />
-                    Broadcasting to Telegram...
+                    Broadcasting to network...
                   </>
                 ) : (
                   <>

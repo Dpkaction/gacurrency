@@ -452,11 +452,4 @@ class GSCWalletTester {
 // Export for use in components or manual testing
 export { GSCWalletTester };
 
-// Auto-run tests if in development mode
-if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-  // Run tests after a short delay to ensure services are initialized
-  setTimeout(async () => {
-    const tester = new GSCWalletTester();
-    await tester.runAllTests();
-  }, 2000);
-}
+// Auto-run tests disabled for production build

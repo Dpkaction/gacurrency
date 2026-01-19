@@ -7,7 +7,7 @@ const phases = [
     subtitle: "Distributed Mining",
     description: "Participate in the distributed mining process using Proof of Time Zone (PoTZ) consensus. Earn VAGS tokens backed by real gold and silver.",
     icon: Pickaxe,
-    status: "active",
+    status: "completed",
     features: ["PoTZ Validation", "Distributed Network", "Fair Distribution"],
   },
   {
@@ -16,7 +16,7 @@ const phases = [
     subtitle: "Secure Storage",
     description: "Create your non-custodial wallet with private key generation and 12-24 word seed phrase recovery. Full control of your assets.",
     icon: Wallet,
-    status: "upcoming",
+    status: "completed",
     features: ["Private Keys", "Seed Phrase Backup", "Multi-Currency View"],
   },
   {
@@ -25,7 +25,7 @@ const phases = [
     subtitle: "Global Transactions",
     description: "VAGS becomes available for worldwide transactions. Trade, transfer, and utilize your metal-backed digital assets globally.",
     icon: Globe,
-    status: "upcoming",
+    status: "active",
     features: ["P2P Transactions", "Exchange Listing", "Global Access"],
   },
 ];
@@ -33,19 +33,30 @@ const phases = [
 const PhaseIcon = ({ Icon, status }: { Icon: any; status: string }) => (
   <div
     className={`relative w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-500 ${
-      status === "active"
-        ? "bg-gradient-gold glow-gold"
-        : "glass-card border-silver/20"
+      status === "completed"
+        ? "bg-gradient-to-br from-green-500 to-green-600 glow-green shadow-lg shadow-green-500/25"
+        : status === "active"
+        ? "bg-gradient-gold glow-gold shadow-lg shadow-gold/25"
+        : "glass-card border-silver/20 hover:border-silver/40"
     }`}
   >
     <Icon
-      className={`w-8 h-8 ${
-        status === "active" ? "text-midnight" : "text-silver"
+      className={`w-8 h-8 transition-colors duration-300 ${
+        status === "completed" 
+          ? "text-white" 
+          : status === "active" 
+          ? "text-midnight" 
+          : "text-silver hover:text-silver/80"
       }`}
     />
+    {status === "completed" && (
+      <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-green-400 border-2 border-white flex items-center justify-center shadow-lg">
+        <Check className="w-4 h-4 text-white font-bold" />
+      </div>
+    )}
     {status === "active" && (
-      <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-success flex items-center justify-center">
-        <Check className="w-3 h-3 text-success-foreground" />
+      <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gold border-2 border-white flex items-center justify-center shadow-lg animate-pulse">
+        <div className="w-2 h-2 rounded-full bg-midnight" />
       </div>
     )}
     {status === "upcoming" && (
@@ -90,8 +101,10 @@ const PhasesSection = () => {
               {/* Phase Card */}
               <div
                 className={`glass-card p-8 h-full transition-all duration-500 hover:scale-[1.02] ${
-                  phase.status === "active"
-                    ? "border-gold/30 glow-gold-sm"
+                  phase.status === "completed"
+                    ? "border-green-500/30 glow-green-sm bg-green-500/5"
+                    : phase.status === "active"
+                    ? "border-gold/30 glow-gold-sm bg-gold/5"
                     : "hover:border-silver/30"
                 }`}
               >
@@ -100,7 +113,11 @@ const PhasesSection = () => {
                   <PhaseIcon Icon={phase.icon} status={phase.status} />
                   <span
                     className={`font-display text-6xl font-bold ${
-                      phase.status === "active" ? "text-gold/20" : "text-silver/10"
+                      phase.status === "completed" 
+                        ? "text-green-500/20" 
+                        : phase.status === "active" 
+                        ? "text-gold/20" 
+                        : "text-silver/10"
                     }`}
                   >
                     {String(phase.id).padStart(2, "0")}
@@ -111,7 +128,11 @@ const PhasesSection = () => {
                 <div className="mb-6">
                   <span
                     className={`text-xs font-semibold uppercase tracking-wider ${
-                      phase.status === "active" ? "text-gold" : "text-silver"
+                      phase.status === "completed" 
+                        ? "text-green-400" 
+                        : phase.status === "active" 
+                        ? "text-gold" 
+                        : "text-silver"
                     }`}
                   >
                     {phase.subtitle}
@@ -131,11 +152,15 @@ const PhasesSection = () => {
                       key={i}
                       className="flex items-center gap-2 text-sm text-foreground/70"
                     >
-                      <ArrowRight
-                        className={`w-3 h-3 ${
-                          phase.status === "active" ? "text-gold" : "text-silver"
-                        }`}
-                      />
+                      {phase.status === "completed" ? (
+                        <Check className="w-3 h-3 text-green-400" />
+                      ) : (
+                        <ArrowRight
+                          className={`w-3 h-3 ${
+                            phase.status === "active" ? "text-gold" : "text-silver"
+                          }`}
+                        />
+                      )}
                       {feature}
                     </li>
                   ))}
@@ -145,19 +170,29 @@ const PhasesSection = () => {
                 <div className="mt-6 pt-6 border-t border-border">
                   <span
                     className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
-                      phase.status === "active"
-                        ? "bg-gold/10 text-gold"
-                        : "bg-silver/10 text-silver"
+                      phase.status === "completed"
+                        ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                        : phase.status === "active"
+                        ? "bg-gold/10 text-gold border border-gold/20"
+                        : "bg-silver/10 text-silver border border-silver/20"
                     }`}
                   >
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        phase.status === "active"
-                          ? "bg-gold animate-pulse"
-                          : "bg-silver"
-                      }`}
-                    />
-                    {phase.status === "active" ? "Currently Active" : "Coming Soon"}
+                    {phase.status === "completed" ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          phase.status === "active"
+                            ? "bg-gold animate-pulse"
+                            : "bg-silver"
+                        }`}
+                      />
+                    )}
+                    {phase.status === "completed" 
+                      ? "Completed" 
+                      : phase.status === "active" 
+                      ? "Currently Active" 
+                      : "Coming Soon"}
                   </span>
                 </div>
               </div>

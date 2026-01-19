@@ -77,57 +77,104 @@ const GSCFullWallet = () => {
   }, [selectedWallet]);
 
   const loadWallets = () => {
-    const loadedWallets = gscBlockchainService.getWallets();
-    console.log("=== LOADING WALLETS ===");
-    console.log("Loaded wallets from service:", loadedWallets);
-    
-    // Update each wallet with real blockchain balance
-    const walletsWithRealBalance = loadedWallets.map(wallet => {
-      const balance = gscBlockchainService.getWalletBalance(wallet.address);
-      console.log(`Wallet ${wallet.address}: balance ${balance} GSC`);
-      return {
-        ...wallet,
-        balance: balance
-      };
-    });
-    
-    setWallets(walletsWithRealBalance);
-    console.log("Wallets with real balance:", walletsWithRealBalance);
-    
-    // Set first wallet as selected if none selected, but prioritize GSC1705641e65321ef23ac5fb3d470f39627
-    const targetWallet = walletsWithRealBalance.find(w => w.address === "GSC1705641e65321ef23ac5fb3d470f39627");
-    if (targetWallet && !selectedWallet) {
-      console.log("Setting target wallet as selected:", targetWallet.name);
-      setSelectedWallet(targetWallet.name);
-    } else if (walletsWithRealBalance.length > 0 && !selectedWallet) {
-      console.log("Setting first wallet as selected:", walletsWithRealBalance[0].name);
-      setSelectedWallet(walletsWithRealBalance[0].name);
-    }
-    
-    // Load transaction history for the active wallet
-    setTimeout(() => loadTransactionHistory(), 100);
-  };
-
-  const loadTransactionHistory = () => {
-    const activeWallet = getActiveWallet();
-    console.log("=== LOADING TRANSACTION HISTORY ===");
-    console.log("Selected wallet name:", selectedWallet);
-    console.log("Active wallet:", activeWallet);
-    console.log("All wallets:", wallets);
-    
-    if (activeWallet) {
-      console.log("Loading history for address:", activeWallet.address);
-      const history = gscBlockchainService.getTransactionHistory(activeWallet.address);
-      console.log("Transaction history loaded:", history.length, "transactions");
-      setTransactionHistory(history);
-    } else {
-      console.log("No active wallet found");
-      setTransactionHistory([]);
+    try {
+      const loadedWallets = gscBlockchainService.getWallets();
+      console.log("=== LOADING WALLETS ===");
+      console.log("Loaded wallets from service:", loadedWallets);
+      
+      // Ensure loadedWallets is an array
+      if (!Array.isArray(loadedWallets)) {
+        console.warn("getWallets() did not return an array, using empty array");
+        setWallets([]);
+        return;
+      }
+      
+      // Update each wallet with real blockchain balance
+      const walletsWithRealBalance = loadedWallets.map(wallet => {
+        if (!wallet || !wallet.address) {
+          console.warn("Invalid wallet object:", wallet);
+          return wallet;
+        }
+        
+        const balance = gscBlockchainService.getWalletBalance(wallet.address);
+        console.log(`Wallet ${wallet.address}: balance ${balance} GSC`);
+        return {
+          ...wallet,
+          balance: balance || 0
+        };
+      });
+      
+      setWallets(walletsWithRealBalance);
+      console.log("Wallets with real balance:", walletsWithRealBalance);
+      
+      // Set first wallet as selected if none selected, but prioritize GSC1705641e65321ef23ac5fb3d470f39627
+      const targetWallet = walletsWithRealBalance.find(w => w && w.address === "GSC1705641e65321ef23ac5fb3d470f39627");
+      if (targetWallet && !selectedWallet) {
+        console.log("Setting target wallet as selected:", targetWallet.name);
+        setSelectedWallet(targetWallet.name);
+      } else if (walletsWithRealBalance.length > 0 && !selectedWallet && walletsWithRealBalance[0]) {
+        console.log("Setting first wallet as selected:", walletsWithRealBalance[0].name);
+        setSelectedWallet(walletsWithRealBalance[0].name);
+      }
+      
+      // Load transaction history for the active wallet
+      setTimeout(() => loadTransactionHistory(), 100);
+    } catch (error) {
+      console.error("Error loading wallets:", error);
+      setWallets([]);
     }
   };
 
   const getActiveWallet = (): GSCWallet | null => {
-    return wallets.find(w => w.name === selectedWallet) || null;
+    if (!Array.isArray(wallets) || wallets.length === 0) {
+      return null;
+    }
+    return wallets.find(w => w && w.name === selectedWallet) || null;
+  };
+
+  const loadTransactionHistory = () => {
+    try {
+      const activeWallet = getActiveWallet();
+      console.log("=== LOADING TRANSACTION HISTORY ===");
+      console.log("Selected wallet name:", selectedWallet);
+      console.log("Active wallet:", activeWallet);
+      console.log("All wallets:", wallets);
+      
+      if (activeWallet && activeWallet.address) {
+        console.log("Loading history for address:", activeWallet.address);
+        const history = gscBlockchainService.getTransactionHistory(activeWallet.address);
+        console.log("Transaction history loaded:", history?.length || 0, "transactions");
+        
+        // Transform raw transactions into the expected format
+        const transformedHistory = Array.isArray(history) ? history.map(tx => {
+          if (!tx || !tx.tx_id) {
+            console.warn("Invalid transaction object:", tx);
+            return null;
+          }
+          
+          const isSent = tx.sender === activeWallet.address;
+          const counterparty = isSent ? tx.receiver : tx.sender;
+          const date = new Date(tx.timestamp * 1000).toLocaleDateString();
+          
+          return {
+            transaction: tx,
+            type: isSent ? 'sent' as const : 'received' as const,
+            amount: isSent ? -tx.amount : tx.amount,
+            counterparty: counterparty,
+            timestamp: tx.timestamp,
+            date: date
+          };
+        }).filter(item => item !== null) : [];
+        
+        setTransactionHistory(transformedHistory);
+      } else {
+        console.log("No active wallet found");
+        setTransactionHistory([]);
+      }
+    } catch (error) {
+      console.error("Error loading transaction history:", error);
+      setTransactionHistory([]);
+    }
   };
 
   const handleCreateWallet = () => {
@@ -293,7 +340,7 @@ const GSCFullWallet = () => {
         }
         
         // Check if wallet name already exists
-        const existingWallet = wallets.find(w => w.name === walletData.name);
+        const existingWallet = Array.isArray(wallets) ? wallets.find(w => w && w.name === walletData.name) : null;
         if (existingWallet) {
           setConflictWalletName(walletData.name);
           setPendingRestoreFile(file);
@@ -448,21 +495,21 @@ const GSCFullWallet = () => {
   const blockchainStats = gscBlockchainService.getBlockchainStats();
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="w-full max-w-7xl mx-auto p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 p-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">VAGS Wallet</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-white">VAGS Wallet</h1>
             <p className="text-sm text-gray-400">Production-Grade Blockchain Wallet</p>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             {/* Active Wallet Display */}
             {selectedWallet && (
-              <div className="text-right">
+              <div className="text-center sm:text-right">
                 <p className="text-sm text-gray-400">Active Wallet</p>
-                <p className="text-white font-medium">{selectedWallet}</p>
+                <p className="text-white font-medium truncate max-w-[200px]">{selectedWallet}</p>
                 <p className="text-xs text-yellow-400">
                   Balance: {getActiveWallet()?.balance?.toFixed(8) || "0.00000000"} GSC
                 </p>
@@ -471,38 +518,43 @@ const GSCFullWallet = () => {
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="border-yellow-500/30 hover:bg-yellow-500/10 text-yellow-400">
+                <Button variant="outline" className="border-yellow-500/30 hover:bg-yellow-500/10 text-yellow-400 w-full sm:w-auto">
                   {selectedWallet ? "Wallet Options" : "Select Wallet"}
                   <ChevronDown className="w-4 h-4 ml-2" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="bg-gray-800 border-gray-700 w-64">
                 {/* Available Wallets Section */}
-                {wallets.length > 0 && (
+                {Array.isArray(wallets) && wallets.length > 0 && (
                   <>
                     <div className="px-2 py-1 text-xs text-gray-400 font-medium">Available Wallets</div>
-                    {wallets.map((wallet, index) => (
-                      <DropdownMenuItem 
-                        key={index}
-                        onClick={() => setSelectedWallet(wallet.name)}
-                        className={`text-white hover:bg-gray-700 flex flex-col items-start py-3 ${
-                          selectedWallet === wallet.name ? 'bg-gray-700' : ''
-                        }`}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="font-medium">{wallet.name}</span>
-                          {selectedWallet === wallet.name && (
-                            <Check className="w-4 h-4 text-green-400" />
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-400 mt-1">
-                          {wallet.address.substring(0, 20)}...
-                        </div>
-                        <div className="text-xs text-yellow-400">
-                          {wallet.balance.toFixed(8)} GSC
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
+                    {wallets.map((wallet, index) => {
+                      if (!wallet || !wallet.name || !wallet.address) {
+                        return null;
+                      }
+                      return (
+                        <DropdownMenuItem 
+                          key={index}
+                          onClick={() => setSelectedWallet(wallet.name)}
+                          className={`text-white hover:bg-gray-700 flex flex-col items-start py-3 ${
+                            selectedWallet === wallet.name ? 'bg-gray-700' : ''
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-medium">{wallet.name}</span>
+                            {selectedWallet === wallet.name && (
+                              <Check className="w-4 h-4 text-green-400" />
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">
+                            {wallet.address.substring(0, 20)}...
+                          </div>
+                          <div className="text-xs text-yellow-400">
+                            {(wallet.balance || 0).toFixed(8)} GSC
+                          </div>
+                        </DropdownMenuItem>
+                      );
+                    })}
                     <DropdownMenuSeparator className="bg-gray-600" />
                   </>
                 )}
@@ -531,27 +583,54 @@ const GSCFullWallet = () => {
                   Generate Paper Wallet
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-gray-600" />
-                <DropdownMenuItem onClick={() => {
-                  gscBlockchainService.forceLoadGSCBlockchain();
-                  setTimeout(() => {
+                <DropdownMenuItem onClick={async () => {
+                  try {
+                    // Store current selected wallet to restore after refresh
+                    const currentSelectedWallet = selectedWallet;
+                    
+                    // Import fresh blockchain data from server
+                    const { supabaseBlockchainService } = await import("@/services/supabaseBlockchain");
+                    await supabaseBlockchainService.importFromServer();
+                    
+                    // Refresh blockchain while preserving existing wallets
+                    gscBlockchainService.refreshBlockchainData();
+                    
+                    // Reload wallets and transaction history
                     loadWallets();
-                    loadTransactionHistory();
-                  }, 500);
-                }} className="text-green-400 hover:bg-gray-700">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Load GSC Blockchain Data
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => {
-                  gscBlockchainService.updateAllWalletBalances();
-                  loadWallets();
-                  loadTransactionHistory();
+                    
+                    // Restore selected wallet after a short delay to ensure wallets are loaded
+                    setTimeout(() => {
+                      if (currentSelectedWallet) {
+                        const updatedWallets = gscBlockchainService.getWallets();
+                        const walletStillExists = updatedWallets.find(w => w && w.name === currentSelectedWallet);
+                        if (walletStillExists) {
+                          setSelectedWallet(currentSelectedWallet);
+                        } else if (updatedWallets.length > 0) {
+                          // If current wallet doesn't exist, select the first available wallet
+                          setSelectedWallet(updatedWallets[0].name);
+                        }
+                      } else if (gscBlockchainService.getWallets().length > 0) {
+                        // If no wallet was selected, select the first available wallet
+                        setSelectedWallet(gscBlockchainService.getWallets()[0].name);
+                      }
+                      loadTransactionHistory();
+                    }, 100);
+                    
+                    toast({
+                      title: "Blockchain Refreshed",
+                      description: "Blockchain data updated while preserving your wallets",
+                    });
+                  } catch (error) {
+                    console.error("Error refreshing blockchain:", error);
+                    toast({
+                      title: "Refresh Failed",
+                      description: "Failed to refresh blockchain data",
+                      variant: "destructive",
+                    });
+                  }
                 }} className="text-blue-400 hover:bg-gray-700">
                   <RefreshCw className="w-4 h-4 mr-2" />
-                  Refresh Wallet Balances
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => document.getElementById('blockchain-file-import')?.click()} className="text-yellow-400 hover:bg-gray-700">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Import Blockchain File
+                  Refresh Blockchain
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-gray-600" />
                 <DropdownMenuItem onClick={() => {
@@ -563,115 +642,97 @@ const GSCFullWallet = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            
+            {/* Login ID Display */}
+            {getActiveWallet() && (
+              <div className="font-mono text-xs text-white break-all">
+                {getActiveWallet()?.address || "No wallet selected"}
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Hidden file input for blockchain import */}
-        <input
-          type="file"
-          accept=".json,.blockchain"
-          onChange={async (event) => {
-            const file = event.target.files?.[0];
-            if (!file) return;
-            
-            try {
-              const success = await gscBlockchainService.importBlockchain(file);
-              if (success) {
-                // Refresh wallets and balances
-                loadWallets();
-                gscBlockchainService.updateAllWalletBalances();
-              }
-            } catch (error) {
-              console.error("Blockchain import failed:", error);
-            }
-          }}
-          className="hidden"
-          id="blockchain-file-import"
-        />
-
-        {/* Login ID Display */}
-        {selectedWallet && (
-          <div className="mt-4 p-3 bg-gray-700 rounded">
-            <div className="text-sm text-gray-300">Your Login ID (DID)</div>
-            <div className="font-mono text-xs text-white break-all">
-              {getActiveWallet()?.address || "No wallet selected"}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Main Content */}
-      <div className="p-6">
-        {selectedWallet && getActiveWallet() ? (
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="bg-gray-800 border-gray-700">
-              <TabsTrigger value="overview" className="data-[state=active]:bg-gray-600">Overview</TabsTrigger>
-              <TabsTrigger value="send" className="data-[state=active]:bg-gray-600">Send</TabsTrigger>
-              <TabsTrigger value="receive" className="data-[state=active]:bg-gray-600">Receive</TabsTrigger>
-              <TabsTrigger value="statistics" className="data-[state=active]:bg-gray-600">Statistics</TabsTrigger>
-              <TabsTrigger value="blockchain" className="data-[state=active]:bg-gray-600">Blockchain</TabsTrigger>
-              <TabsTrigger value="explorer" className="data-[state=active]:bg-gray-600">TX Explorer</TabsTrigger>
-              <TabsTrigger value="bc-explorer" className="data-[state=active]:bg-gray-600 text-yellow-400">BC Explorer</TabsTrigger>
-            </TabsList>
+      {Array.isArray(wallets) && wallets.length > 0 && selectedWallet && getActiveWallet() ? (
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="bg-gray-800/50 border-gray-700 w-full overflow-x-auto scrollbar-hide">
+            <div className="flex min-w-max gap-1 p-1">
+              <TabsTrigger value="overview" className="data-[state=active]:bg-gray-600 text-xs sm:text-sm px-3 py-2 whitespace-nowrap">Overview</TabsTrigger>
+              <TabsTrigger value="send" className="data-[state=active]:bg-gray-600 text-xs sm:text-sm px-3 py-2 whitespace-nowrap">Send</TabsTrigger>
+              <TabsTrigger value="receive" className="data-[state=active]:bg-gray-600 text-xs sm:text-sm px-3 py-2 whitespace-nowrap">Receive</TabsTrigger>
+              <TabsTrigger value="statistics" className="data-[state=active]:bg-gray-600 text-xs sm:text-sm px-3 py-2 whitespace-nowrap">Statistics</TabsTrigger>
+              <TabsTrigger value="blockchain" className="data-[state=active]:bg-gray-600 text-xs sm:text-sm px-3 py-2 whitespace-nowrap">Blockchain</TabsTrigger>
+              <TabsTrigger value="explorer" className="data-[state=active]:bg-gray-600 text-xs sm:text-sm px-3 py-2 whitespace-nowrap">TX Explorer</TabsTrigger>
+              <TabsTrigger value="bc-explorer" className="data-[state=active]:bg-gray-600 text-yellow-400 text-xs sm:text-sm px-3 py-2 whitespace-nowrap">BC Explorer</TabsTrigger>
+            </div>
+          </TabsList>
 
-            {/* Overview Tab */}
-            <TabsContent value="overview" className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="bg-gray-800 border-gray-700">
-                  <CardHeader>
-                    <CardTitle className="text-white">Available Balance</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-green-400">
-                      {getActiveWallet()?.balance.toFixed(8)} GSC
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gray-800 border-gray-700">
-                  <CardHeader>
-                    <CardTitle className="text-white">Send GSC Coins</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <Label className="text-gray-300">Recipient Address:</Label>
-                      <Input
-                        value={sendAddress}
-                        onChange={(e) => setSendAddress(e.target.value)}
-                        placeholder="GSC1..."
-                        className="bg-gray-700 border-gray-600 text-white"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-gray-300">Amount:</Label>
-                      <Input
-                        type="number"
-                        value={sendAmount}
-                        onChange={(e) => setSendAmount(e.target.value)}
-                        placeholder="1.0"
-                        className="bg-gray-700 border-gray-600 text-white"
-                      />
-                    </div>
-                    <Button onClick={handleSendTransaction} className="w-full">
-                      <Send className="w-4 h-4 mr-2" />
-                      Send Transaction
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Transaction History */}
-              <Card className="bg-gray-800 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white">Recent Transactions</CardTitle>
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-4 sm:space-y-6 mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+              <Card className="bg-gray-800/50 border-gray-700">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-white text-lg">Available Balance</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ScrollArea className="h-[300px]">
-                    {transactionHistory.length > 0 ? (
-                      <div className="space-y-2">
-                        {transactionHistory.slice(0, 10).map((historyItem, index) => (
+                  <div className="text-2xl sm:text-3xl font-bold text-green-400">
+                    {getActiveWallet()?.balance.toFixed(8)} GSC
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gray-800/50 border-gray-700">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-white text-lg">Send GSC Coins</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label className="text-gray-300 text-sm">Recipient Address:</Label>
+                    <Input
+                      value={sendAddress}
+                      onChange={(e) => setSendAddress(e.target.value)}
+                      placeholder="GSC1..."
+                      className="bg-gray-700 border-gray-600 text-white mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-gray-300 text-sm">Amount:</Label>
+                    <Input
+                      type="number"
+                      value={sendAmount}
+                      onChange={(e) => setSendAmount(e.target.value)}
+                      placeholder="1.0"
+                      className="bg-gray-700 border-gray-600 text-white mt-1"
+                    />
+                  </div>
+                  <Button onClick={handleSendTransaction} className="w-full bg-blue-600 hover:bg-blue-700">
+                    <Send className="w-4 h-4 mr-2" />
+                    Send Transaction
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Transaction History */}
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-white text-lg">Recent Transactions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[250px] sm:h-[300px]">
+                  {Array.isArray(transactionHistory) && transactionHistory.length > 0 ? (
+                    <div className="space-y-2">
+                      {transactionHistory.slice(0, 10).map((historyItem, index) => {
+                        // Safety check to ensure historyItem and transaction exist
+                        if (!historyItem || !historyItem.transaction || !historyItem.transaction.tx_id) {
+                          console.warn("Invalid history item at index", index, historyItem);
+                          return null;
+                        }
+                        
+                        return (
                           <div 
-                            key={index} 
+                            key={historyItem.transaction.tx_id || index} 
                             className="flex justify-between items-center p-3 bg-gray-700 rounded cursor-pointer hover:bg-gray-600 transition-colors"
                             onClick={() => handleTransactionClick(historyItem)}
                           >
@@ -688,21 +749,22 @@ const GSCFullWallet = () => {
                             </div>
                             <div className="text-right ml-4">
                               <div className={`font-medium ${historyItem.type === 'sent' ? 'text-red-400' : 'text-green-400'}`}>
-                                {historyItem.amount > 0 ? '+' : ''}{historyItem.amount.toFixed(8)} GSC
+                                {historyItem.amount > 0 ? '+' : ''}{(historyItem.amount || 0).toFixed(8)} GSC
                               </div>
                               <div className="text-gray-400 text-sm">
-                                {new Date(historyItem.timestamp * 1000).toLocaleDateString()}
+                                {new Date((historyItem.timestamp || Date.now() / 1000) * 1000).toLocaleDateString()}
                               </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center text-gray-400 py-8">
-                        No transactions found
-                      </div>
-                    )}
-                  </ScrollArea>
+                        );
+                      }).filter(item => item !== null)}
+                    </div>
+                  ) : (
+                    <div className="text-center text-gray-400 py-8">
+                      No transactions found
+                    </div>
+                  )}
+                </ScrollArea>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -754,16 +816,18 @@ const GSCFullWallet = () => {
             </TabsContent>
 
             {/* Receive Tab */}
-            <TabsContent value="receive" className="space-y-6">
+            <TabsContent value="receive" className="space-y-4 sm:space-y-6">
               <Card className="bg-gray-800 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white">Your Address</CardTitle>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-white text-lg">Your Address</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="p-4 bg-gray-700 rounded font-mono text-sm break-all text-white">
-                    {getActiveWallet()?.address}
+                  <div className="p-3 sm:p-4 bg-gray-700 rounded-lg">
+                    <div className="font-mono text-xs sm:text-sm break-all text-white leading-relaxed">
+                      {getActiveWallet()?.address}
+                    </div>
                   </div>
-                  <Button onClick={copyAddress} className="w-full">
+                  <Button onClick={copyAddress} className="w-full py-2 sm:py-3">
                     <Copy className="w-4 h-4 mr-2" />
                     Copy Address
                   </Button>
@@ -966,23 +1030,21 @@ const GSCFullWallet = () => {
                 </CardContent>
               </Card>
             </TabsContent>
-          </Tabs>
-        ) : (
-          <div className="text-center py-12">
-            <h2 className="text-xl font-semibold text-white mb-4">No Wallet Selected</h2>
-            <p className="text-gray-400 mb-6">Please select or create a wallet to get started</p>
-            <Button onClick={() => setShowCreateWallet(true)} className="mr-4">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Wallet
-            </Button>
-            <Button variant="outline" onClick={() => setShowRestoreWallet(true)}>
-              <Upload className="w-4 h-4 mr-2" />
-              Import Wallet
-            </Button>
-          </div>
-        )}
-      </div>
-
+        </Tabs>
+      ) : (
+        <div className="text-center py-12">
+          <h2 className="text-xl font-semibold text-white mb-4">No Wallet Selected</h2>
+          <p className="text-gray-400 mb-6">Please select or create a wallet to get started</p>
+          <Button onClick={() => setShowCreateWallet(true)} className="mr-4">
+            <Plus className="w-4 h-4 mr-2" />
+            Create Wallet
+          </Button>
+          <Button variant="outline" onClick={() => setShowRestoreWallet(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Import Wallet
+          </Button>
+        </div>
+      )}
       {/* Create Wallet Dialog */}
       <Dialog open={showCreateWallet} onOpenChange={setShowCreateWallet}>
         <DialogContent className="bg-gray-800 border-gray-700">

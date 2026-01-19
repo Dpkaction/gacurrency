@@ -701,14 +701,18 @@ const GSCCompleteInterface = ({ activeWallet }: GSCCompleteInterfaceProps) => {
           </Card>
         </TabsContent>
 
-        {/* Tests Tab */}
+        {/* Tests Tab - Hidden in production */}
         <TabsContent value="tests" className="space-y-4">
-          <GSCTestRunner />
+          <div className="p-8 text-center text-muted-foreground">
+            <p>Test functionality disabled in production build.</p>
+          </div>
         </TabsContent>
 
-        {/* Debug Tab */}
+        {/* Debug Tab - Hidden in production */}
         <TabsContent value="debug" className="space-y-4">
-          <GSCSimpleTest />
+          <div className="p-8 text-center text-muted-foreground">
+            <p>Debug functionality disabled in production build.</p>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

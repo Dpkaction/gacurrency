@@ -40,26 +40,176 @@ const Ambassador = () => {
 
     setIsSubmitting(true);
 
-    // Simulate submission (replace with actual API call)
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      // First, let's test if the bot token is valid
+      const botToken = "8235026634:AAE0tNMsvAODsst9h9WhAXAtdjSF2N13wOQ";
+      
+      // Test bot token validity first
+      console.log("Testing bot token validity...");
+      try {
+        const botInfoResponse = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
+        const botInfo = await botInfoResponse.json();
+        console.log("Bot info:", botInfo);
+        
+        if (!botInfo.ok) {
+          throw new Error(`Invalid bot token: ${botInfo.description}`);
+        }
+      } catch (tokenError) {
+        console.error("Bot token validation failed:", tokenError);
+        toast({
+          title: "Configuration Error",
+          description: "Bot token is invalid. Please check the bot configuration.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const message = `🌟 New VAGS Ambassador Application
 
-    toast({
-      title: "Application Submitted!",
-      description: "Thank you for your interest. We'll review your application and get back to you soon.",
-    });
+👤 Full Name: ${formData.fullName}
+🏷️ Username: ${formData.username}
+📧 Email: ${formData.email}
+📱 Phone: ${formData.phone || "Not provided"}
+🌍 Country: ${formData.country}
+🏙️ City: ${formData.city || "Not provided"}
 
-    // Reset form
-    setFormData({
-      fullName: "",
-      username: "",
-      email: "",
-      phone: "",
-      country: "",
-      city: "",
-      motivation: "",
-    });
+💭 Motivation:
+${formData.motivation || "Not provided"}
 
-    setIsSubmitting(false);
+📅 Submitted: ${new Date().toLocaleString()}`;
+
+      let success = false;
+      let errorDetails = "";
+      
+      // Try different chat ID formats - the bot might need to be contacted directly
+      const chatConfigs = [
+        "@gscambassador_bot",
+        "gscambassador_bot",
+        // If the above don't work, we'll need the actual chat ID number
+      ];
+      
+      for (const chatId of chatConfigs) {
+        try {
+          console.log(`Attempting to send to chat ID: ${chatId}`);
+          
+          const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: message
+            })
+          });
+          
+          const responseData = await response.json();
+          console.log(`Telegram API response for ${chatId}:`, responseData);
+          
+          if (response.ok && responseData.ok) {
+            success = true;
+            console.log("Successfully sent to Telegram!");
+            break;
+          } else {
+            errorDetails += `Chat ID ${chatId}: ${responseData.description || responseData.error_code || 'Unknown error'}. `;
+            
+            // If it's a "chat not found" error, the bot username might be wrong
+            if (responseData.description && responseData.description.includes("chat not found")) {
+              errorDetails += "Bot username may not exist or bot hasn't been started. ";
+            }
+          }
+        } catch (apiError) {
+          console.log(`API call failed for chat ID ${chatId}:`, apiError);
+          errorDetails += `Chat ID ${chatId}: ${apiError.message}. `;
+        }
+      }
+      
+      // If direct API calls fail, try alternative approach
+      if (!success) {
+        console.log("Direct API failed, trying alternative methods...");
+        
+        // Create a simple webhook test
+        try {
+          const testResponse = await fetch(`https://api.telegram.org/bot${botToken}/getUpdates`);
+          const testData = await testResponse.json();
+          console.log("Bot updates test:", testData);
+          
+          if (testData.ok) {
+            errorDetails += "Bot is working but chat ID is incorrect. ";
+            
+            // If there are updates, we can get the correct chat ID
+            if (testData.result && testData.result.length > 0) {
+              const lastUpdate = testData.result[testData.result.length - 1];
+              if (lastUpdate.message && lastUpdate.message.chat) {
+                const correctChatId = lastUpdate.message.chat.id;
+                console.log("Found correct chat ID:", correctChatId);
+                
+                // Try with the correct chat ID
+                try {
+                  const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      chat_id: correctChatId,
+                      text: message
+                    })
+                  });
+                  
+                  const responseData = await response.json();
+                  if (response.ok && responseData.ok) {
+                    success = true;
+                    console.log("Successfully sent using discovered chat ID!");
+                  }
+                } catch (finalError) {
+                  console.log("Final attempt failed:", finalError);
+                }
+              }
+            }
+          }
+        } catch (alternativeError) {
+          console.log("Alternative method failed:", alternativeError);
+          errorDetails += `Alternative method error: ${alternativeError.message}. `;
+        }
+      }
+
+      if (success) {
+        toast({
+          title: "Application Submitted!",
+          description: "Your application has been successfully sent to @gscambassador_bot on network.",
+        });
+
+        // Reset form
+        setFormData({
+          fullName: "",
+          username: "",
+          email: "",
+          phone: "",
+          country: "",
+          city: "",
+          motivation: "",
+        });
+      } else {
+        // Log detailed error information for debugging
+        console.error("All Telegram API methods failed. Error details:", errorDetails);
+        
+        toast({
+          title: "Bot Configuration Issue",
+          description: `Failed to send to @gscambassador_bot. Error: ${errorDetails.substring(0, 100)}... Check console for details.`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Submission error:", error);
+      toast({
+        title: "Submission Failed",
+        description: "Failed to broadcast to network. Please check your connection and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const benefits = [

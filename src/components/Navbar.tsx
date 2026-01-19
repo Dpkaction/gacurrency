@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, X, Wallet, Users, FileText, Bell, LogIn } from "lucide-react";
+import { Menu, X, Wallet, Users, FileText, Bell, LogIn, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const Navbar = () => {
@@ -35,7 +35,7 @@ const Navbar = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
             <div className="relative w-10 h-10 rounded-full bg-gradient-gold flex items-center justify-center glow-gold-sm group-hover:glow-gold transition-all duration-300">
-              <span className="font-display font-bold text-midnight text-lg">V</span>
+              <Coins className="w-6 h-6 text-midnight" />
             </div>
             <span className="font-display font-bold text-xl text-gradient-gold">
               VAGS
@@ -58,18 +58,11 @@ const Navbar = () => {
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-4">
             <Button
-              variant="ghost"
-              className="text-foreground/70 hover:text-gold hover:bg-gold/10"
-              onClick={() => navigate("/login")}
+              className="btn-gold"
+              onClick={() => navigate("/wallet")}
             >
               <LogIn className="w-4 h-4 mr-2" />
-              Login
-            </Button>
-            <Button
-              className="btn-gold"
-              onClick={() => navigate("/signup")}
-            >
-              Get Started
+              Access Wallet
             </Button>
           </div>
 
@@ -99,24 +92,14 @@ const Navbar = () => {
             ))}
             <div className="flex flex-col gap-3 pt-4 border-t border-border">
               <Button
-                variant="ghost"
-                className="justify-start text-foreground/70 hover:text-gold hover:bg-gold/10"
+                className="btn-gold"
                 onClick={() => {
-                  navigate("/login");
+                  navigate("/wallet");
                   setIsMobileMenuOpen(false);
                 }}
               >
                 <LogIn className="w-4 h-4 mr-2" />
-                Login
-              </Button>
-              <Button
-                className="btn-gold"
-                onClick={() => {
-                  navigate("/signup");
-                  setIsMobileMenuOpen(false);
-                }}
-              >
-                Get Started
+                Access Wallet
               </Button>
             </div>
           </div>

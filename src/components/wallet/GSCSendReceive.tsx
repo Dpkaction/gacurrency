@@ -82,7 +82,7 @@ const GSCSendReceive = ({ activeWallet, onTransactionComplete }: GSCSendReceiveP
         
         toast({
           title: "Transaction Sent",
-          description: `Successfully sent ${amount} GSC to @gsc_vags_bot for broadcasting`,
+          description: `Successfully sent ${amount} GSC and broadcast to network`,
         });
       }
     } catch (error) {
@@ -135,7 +135,7 @@ const GSCSendReceive = ({ activeWallet, onTransactionComplete }: GSCSendReceiveP
                 Send GSC Coins
               </CardTitle>
               <CardDescription>
-                Send GSC coins to another address. Transactions are automatically broadcasted to @gsc_vags_bot.
+                Send GSC coins to another address. Transactions are automatically broadcast to network.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -211,7 +211,7 @@ const GSCSendReceive = ({ activeWallet, onTransactionComplete }: GSCSendReceiveP
                   {isLoading ? (
                     <>
                       <Send className="w-4 h-4 mr-2 animate-pulse" />
-                      Broadcasting to @gsc_vags_bot...
+                      Broadcasting to network...
                     </>
                   ) : (
                     <>
@@ -302,7 +302,7 @@ const GSCSendReceive = ({ activeWallet, onTransactionComplete }: GSCSendReceiveP
                   <li>• Share your GSC address with the sender</li>
                   <li>• Or show them the QR code for easy scanning</li>
                   <li>• Transactions will appear in your wallet automatically</li>
-                  <li>• All incoming transactions are broadcasted via @gsc_vags_bot</li>
+                  <li>• All incoming transactions are broadcast to network</li>
                 </ul>
               </div>
 
